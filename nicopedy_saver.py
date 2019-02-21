@@ -128,7 +128,7 @@ for url in targetURLs:
         print(formattedBody[i])
         print()
 
-    break
+    # break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
