@@ -6,6 +6,7 @@ from time import sleep      # 待ち時間用
 from pprint import pprint  # 改行付き配列出力
 import csv
 import os.path
+import sys
 
 SCRAPING_INTERVAL_TIME = 5.5
 
@@ -31,6 +32,7 @@ class MetaData :
     # 対象ファイルのメタデータの値を取得する
     def GetMetaData(self) :
         return
+
 
 def getSearchTargetURLs(baseURL) :
 
@@ -80,11 +82,19 @@ def getSearchTargetURLs(baseURL) :
     return pageUrls
 
 # ログ新規作成時の動作
-def CreateLogFile() :
+def CreateLogFile(mt) :
+    mt.SetMetaTemplate()
     return
 
 # ログ追記時の動作
-def AppendLogFile() :
+def AppendLogFile(mt) :
+    mt.GetMetaData()
+    return
+
+# 標準出力とファイル出力を同時に行う。
+def TeeOutput(text, file) :
+    print(text + '\n', end="")
+    file.write(text + '\n')
     return
 
 # メイン処理スタート -----------------------------------------------------------------
@@ -105,7 +115,7 @@ print(pageTitle)
 pediLogFileName = pageTitle + ".txt"
 
 # 対象ファイル削除
-# os.remove(pediLogFileName)
+os.remove(pediLogFileName)
 
 metas = MetaData()
 
@@ -113,11 +123,11 @@ metas = MetaData()
 if os.path.exists(pediLogFileName) :
     print("Found log file.")
     openMode = 'a'  # ファイル存在の場合は追記モード
-    metas.GetMetaData()
+    AppendLogFile(metas)
 else :
     print("Not found log file.")
     openMode = 'w'  # ファイル無しの場合は作成モード
-    metas.SetMetaTemplate()
+    CreateLogFile(metas)
 
 # file open
 writer = open(pediLogFileName, openMode)
@@ -178,21 +188,18 @@ for url in targetURLs:
 
     # ヘッダ+本体の形で順に出力する。
     for i in range(resCount):
-        print(formattedHead[i])
-        print(formattedBody[i])
-        print()
-        writer.write(formattedHead[i] + '\n')
-        writer.write(formattedBody[i] + '\n')
-        writer.write('\n')
+        TeeOutput(formattedHead[i], writer)
+        TeeOutput(formattedBody[i], writer)
+        TeeOutput("", writer)
 
-    if (latestId > 50) :
+    if (latestId > 20) :
         break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
-print("Latest =", latestId)
-writer.write("Latest =" + str(latestId))
+out = "Latest = " + str(latestId)
+TeeOutput(out, writer)
 
 writer.close()
 # メイン処理エンド -----------------------------------------------------------------
