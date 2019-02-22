@@ -58,7 +58,6 @@ def getSearchTargetURLs(baseURL) :
 
     return pageUrls
 
-
 # メイン処理スタート
 
 # file open
@@ -77,20 +76,15 @@ art_soup.find('span', class_='article-title-category').decompose()
 # 記事タイトルを取得（カテゴリが削除されていないとそれも含まれてしまう）
 titleTxt = art_soup.find('h1', class_='article-title')
 
-print(titleTxt)
 print(titleTxt.getText())
-# titleTxt = titleTxt.find("span", class_="article-title-category").decompose()
-# print(titleTxt)
-# titleTxt = titleTxt.getText()
-# print(titleTxt)
 
 targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL)
 
-for url in targetURLs:
+for urlgaga in targetURLs:
     # print(url)
 
     # 対象URL
-    r = requests.get(url)
+    r = requests.get(urlgaga)
 
     # 第一引数＝解析対象　第二引数＝パーサー(何を元に解析するか：この場合はHTML)
     soup = BeautifulSoup(r.content, "html.parser")
@@ -128,10 +122,10 @@ for url in targetURLs:
         print(formattedBody[i])
         print()
 
-    break
+    # break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
-    if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
+    if urlgaga != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
 print("END")
 
