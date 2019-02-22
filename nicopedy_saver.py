@@ -5,12 +5,33 @@ import re # 正規表現用
 from time import sleep      # 待ち時間用
 from pprint import pprint  # 改行付き配列出力
 import csv
+import os.path
 
 SCRAPING_INTERVAL_TIME = 5.5
 
-TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
-# https://dic.nicovideo.jp/a/%E3%81%8B%E3%81%B0%E3%82%93%E3%81%95%E3%82%93"
-# https://dic.nicovideo.jp/b/a/9.25%E3%E4%BB%B6/35251-
+# TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
+TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/9.25%E3%81%91%E3%82%82%E3%83%95%E3%83%AC%E4%BA%8B%E4%BB%B6"
+
+class MetaData :
+
+    metaItems = {'updated':'UPDATE', 'threadId':'Thread ID', 'lastId':'Last ID'}
+
+    # メタデータの項目部分を設定する
+    def SetMetaTemplate(self) :
+        print(self.metaItems['updated'])
+        print(self.metaItems['threadId'])
+        print(self.metaItems['lastId'])
+
+        return
+
+    # 対象ファイルへメタデータの値を入力する
+    def SetMetaData(self) :
+        return
+
+    # 対象ファイルのメタデータの値を取得する
+    def GetMetaData(self) :
+        return
+
 def getSearchTargetURLs(baseURL) :
 
     pageUrls = []
@@ -58,16 +79,15 @@ def getSearchTargetURLs(baseURL) :
 
     return pageUrls
 
+# ログ新規作成時の動作
+def CreateLogFile() :
+    return
 
-# メイン処理スタート
+# ログ追記時の動作
+def AppendLogFile() :
+    return
 
-# file open
-f = open("RankingList.csv", "w")
-writer = csv.writer(f, lineterminator="\n")
-header = ["Title", "Tags"]
-writer.writerow(header)
-
-att_dict = {}
+# メイン処理スタート -----------------------------------------------------------------
 
 art_req = requests.get(TARGET_ARTICLE_URL)
 art_soup = BeautifulSoup(art_req.content, 'html.parser')
@@ -77,14 +97,35 @@ art_soup.find('span', class_='article-title-category').decompose()
 # 記事タイトルを取得（カテゴリが削除されていないとそれも含まれてしまう）
 titleTxt = art_soup.find('h1', class_='article-title')
 
-print(titleTxt)
-print(titleTxt.getText())
-# titleTxt = titleTxt.find("span", class_="article-title-category").decompose()
-# print(titleTxt)
-# titleTxt = titleTxt.getText()
-# print(titleTxt)
+# タイトル部のテキストを取得(記事タイトルになる)
+pageTitle = titleTxt.getText()
+print(pageTitle)
+
+# ログファイル名は「(記事タイトル).txt」
+pediLogFileName = pageTitle + ".txt"
+
+# 対象ファイル削除
+# os.remove(pediLogFileName)
+
+metas = MetaData()
+
+# 対象記事へのログファイルが既に存在するかチェック。
+if os.path.exists(pediLogFileName) :
+    print("Found log file.")
+    openMode = 'a'  # ファイル存在の場合は追記モード
+    metas.GetMetaData()
+else :
+    print("Not found log file.")
+    openMode = 'w'  # ファイル無しの場合は作成モード
+    metas.SetMetaTemplate()
+
+# file open
+writer = open(pediLogFileName, openMode)
+writer.write(pageTitle + '\n\n')
 
 targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL)
+
+latestId = 0
 
 for url in targetURLs:
     # print(url)
@@ -106,33 +147,52 @@ for url in targetURLs:
     resCount = 0
     i = 0
 
+    # 整形済みレスヘッダ部取得
     for rhead in resheads :
         h = rhead
         h = h.getText()         # テキスト部分抽出
         h = h.replace('\n', '') # 不要な改行を削除
         h = h.replace(' ', '')  # 不要な空白を削除
         h = h.replace(')', ') ')        # 整形
-        h = h.replace('ID:', ' ID')     # 整形
+        h = h.replace('ID:', ' ID:')     # 整形
         formattedHead.append(h)
 
+        # 当該レスのID番号を取得する
+
+        # 整形済みレスヘッダ先頭の数値要素を取得(正規表現)
+        repat = re.compile('^[0-9]*')
+        thisId = repat.match(h)
+
+        # 当該レスID番号取得(この時点における最新ID)
+        latestId = int(thisId.group())
+
+    # 整形済みレス本体部取得
     for rbody in resbodys :
         b = rbody
         b = b.getText()
-        b = b.strip()
-        b = b.strip('\n')
+        b = b.strip()       # 前後から空白削除
+        b = b.strip('\n')   # 前後から改行削除
         formattedBody.append(b)
+        # カウントするのはheadでもbodyでもどちらでもいいのだが、この数が本ページにおけるレス数になる(通常は30だが最終ページでは少ない可能性あり)
         resCount += 1
 
+    # ヘッダ+本体の形で順に出力する。
     for i in range(resCount):
         print(formattedHead[i])
         print(formattedBody[i])
         print()
+        writer.write(formattedHead[i] + '\n')
+        writer.write(formattedBody[i] + '\n')
+        writer.write('\n')
 
-    break
+    if (latestId > 50) :
+        break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
-print("END")
+print("Latest =", latestId)
+writer.write("Latest =" + str(latestId))
 
-f.close()
+writer.close()
+# メイン処理エンド -----------------------------------------------------------------
