@@ -82,6 +82,9 @@ def getSearchTargetURLs(baseURL) :
 
     return pageUrls
 
+def GetAllResInPage() :
+    return
+
 def CreateMainFile() :
     return
 
@@ -129,9 +132,10 @@ pediLogFileName = pageTitle + ".txt"
 # 一時メインファイル
 tmpMainFile = nowstamp + '.main' + '.tmp'
 
-# 対象ファイル削除
+# 対象ファイル削除 --------------------------------------------
 if os.path.exists(tmpMainFile ) :
     os.remove(tmpMainFile )
+# 対象ファイル削除 --------------------------------------------
 
 metas = MetaData()
 
@@ -139,14 +143,14 @@ metas = MetaData()
 if os.path.exists(tmpMainFile ) :
     print("Found log file.")
     openMode = 'a'
+    writer = open(tmpMainFile, openMode)
 #    writer = AppendLogFile(tmpMainFile , metas)
 else :
     print("Not found log file.")
     openMode = 'w'
+    writer = open(tmpMainFile , openMode)
+    TeeOutput(pageTitle + '\n', writer)
 #    writer = CreateLogFile(tmpMainFile , metas)
-
-writer = open(tmpMainFile , openMode)
-TeeOutput(pageTitle + '\n', writer)
 
 targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL)
 
@@ -225,7 +229,6 @@ metaInfoLine = ' '.join(metaInfo)
 TeeOutput(metaInfoLine, writer)
 writer.close()
 # --------------------------------------------------------------
-
 
 # --------------------------------------------------------------
 # 一時ヘッダ・一時メインファイルの結合。最終ログファイルを出力（シェルスクリプトで実装）
