@@ -4,24 +4,25 @@ from bs4 import BeautifulSoup
 import re # 正規表現用
 from time import sleep      # 待ち時間用
 from pprint import pprint  # 改行付き配列出力
-import csv
 import os.path
-import sys
+from datetime import datetime, timedelta, timezone
+import subprocess
 
 SCRAPING_INTERVAL_TIME = 5.5
 
 # TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
 TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/9.25%E3%81%91%E3%82%82%E3%83%95%E3%83%AC%E4%BA%8B%E4%BB%B6"
 
+# Class START ----------------------------------------------------------------------------------
 class MetaData :
 
     metaItems = {'updated':'UPDATE', 'threadId':'Thread ID', 'lastId':'Last ID'}
 
     # メタデータの項目部分を設定する
-    def SetMetaTemplate(self) :
-        print(self.metaItems['updated'])
-        print(self.metaItems['threadId'])
-        print(self.metaItems['lastId'])
+    def SetMetaTemplate(self, writer) :
+        TeeOutput(self.metaItems['updated'],    writer)
+        TeeOutput(self.metaItems['threadId'],   writer)
+        TeeOutput(self.metaItems['lastId'],     writer)
 
         return
 
@@ -32,7 +33,7 @@ class MetaData :
     # 対象ファイルのメタデータの値を取得する
     def GetMetaData(self) :
         return
-
+# Class END ----------------------------------------------------------------------------------
 
 def getSearchTargetURLs(baseURL) :
 
@@ -81,23 +82,35 @@ def getSearchTargetURLs(baseURL) :
 
     return pageUrls
 
-# ログ新規作成時の動作
-def CreateLogFile(mt) :
-    mt.SetMetaTemplate()
+def CreateMainFile() :
     return
 
-# ログ追記時の動作
-def AppendLogFile(mt) :
-    mt.GetMetaData()
+def CreateMetaFile() :
     return
+
+# ログ新規作成時の動作
+def CreateLogFile(pediLogFileName, mt) :
+    writer = open(pediLogFileName, 'w')
+    mt.SetMetaTemplate(writer)
+    return writer
+
+# ログ追記時の動作
+def AppendLogFile(pediLogFileName, mt) :
+    mt.GetMetaData()
+    writer = open(pediLogFileName, 'a')
+    return writer
 
 # 標準出力とファイル出力を同時に行う。
 def TeeOutput(text, file) :
-    print(text + '\n', end="")
+    # print(text + '\n', end="")
     file.write(text + '\n')
     return
 
 # メイン処理スタート -----------------------------------------------------------------
+
+JST = timezone(timedelta(hours=+9), 'JST')
+now = datetime.now(JST)
+nowstamp = str(round(now.timestamp()))
 
 art_req = requests.get(TARGET_ARTICLE_URL)
 art_soup = BeautifulSoup(art_req.content, 'html.parser')
@@ -109,29 +122,31 @@ titleTxt = art_soup.find('h1', class_='article-title')
 
 # タイトル部のテキストを取得(記事タイトルになる)
 pageTitle = titleTxt.getText()
-print(pageTitle)
 
 # ログファイル名は「(記事タイトル).txt」
 pediLogFileName = pageTitle + ".txt"
 
+# 一時メインファイル
+tmpMainFile = nowstamp + '.main' + '.tmp'
+
 # 対象ファイル削除
-os.remove(pediLogFileName)
+if os.path.exists(tmpMainFile ) :
+    os.remove(tmpMainFile )
 
 metas = MetaData()
 
 # 対象記事へのログファイルが既に存在するかチェック。
-if os.path.exists(pediLogFileName) :
+if os.path.exists(tmpMainFile ) :
     print("Found log file.")
-    openMode = 'a'  # ファイル存在の場合は追記モード
-    AppendLogFile(metas)
+    openMode = 'a'
+#    writer = AppendLogFile(tmpMainFile , metas)
 else :
     print("Not found log file.")
-    openMode = 'w'  # ファイル無しの場合は作成モード
-    CreateLogFile(metas)
+    openMode = 'w'
+#    writer = CreateLogFile(tmpMainFile , metas)
 
-# file open
-writer = open(pediLogFileName, openMode)
-writer.write(pageTitle + '\n\n')
+writer = open(tmpMainFile , openMode)
+TeeOutput(pageTitle + '\n', writer)
 
 targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL)
 
@@ -164,7 +179,7 @@ for url in targetURLs:
         h = h.replace('\n', '') # 不要な改行を削除
         h = h.replace(' ', '')  # 不要な空白を削除
         h = h.replace(')', ') ')        # 整形
-        h = h.replace('ID:', ' ID:')     # 整形
+        h = h.replace('ID:', ' ID:')    # 整形
         formattedHead.append(h)
 
         # 当該レスのID番号を取得する
@@ -198,8 +213,51 @@ for url in targetURLs:
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
-out = "Latest = " + str(latestId)
-TeeOutput(out, writer)
-
 writer.close()
+
+# --------------------------------------------------------------
+# 一時ヘッダーファイル用意
+tmpHeadFile = nowstamp + '.head' + '.tmp'
+
+writer = open(tmpHeadFile, 'w')
+metaInfo = [pageTitle, str(now.strftime("%Y-%m-%d/%H:%M")), str(latestId)]
+metaInfoLine = ' '.join(metaInfo)
+TeeOutput(metaInfoLine, writer)
+writer.close()
+# --------------------------------------------------------------
+
+
+# --------------------------------------------------------------
+# 一時ヘッダ・一時メインファイルの結合。最終ログファイルを出力（シェルスクリプトで実装）
+cmnd = ['./CatFiles.sh', tmpHeadFile, tmpMainFile, pediLogFileName]
+subResult = subprocess.call(cmnd)
+# --------------------------------------------------------------
+
+try:
+    cmnd = ['wc', '-l', pediLogFileName]
+    subResult = subprocess.check_output(cmnd)
+except:
+    print("Error.")
+
+print(subResult)
+
+wc = subResult.split()
+pprint(wc)
+print(wc[0].decode("utf-8"))
+
+try:
+    cmnd = ['head', '-1', pediLogFileName]
+    subResult = subprocess.check_output(cmnd)
+except:
+    print("Error.")
+
+print(subResult)
+
+wc = subResult.split()
+print(wc[0].decode("utf-8"))
+print(wc[1].decode("utf-8"))
+print(wc[2].decode("utf-8"))
+
+
 # メイン処理エンド -----------------------------------------------------------------
+
