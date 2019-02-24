@@ -7,11 +7,13 @@ from pprint import pprint  # 改行付き配列出力
 import os.path
 from datetime import datetime, timedelta, timezone
 import subprocess
+import sys
+import shutil
 
-SCRAPING_INTERVAL_TIME = 5.5
+SCRAPING_INTERVAL_TIME = 3
 
-# TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
-TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/9.25%E3%81%91%E3%82%82%E3%83%95%E3%83%AC%E4%BA%8B%E4%BB%B6"
+TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
+# TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/9.25%E3%81%91%E3%82%82%E3%83%95%E3%83%AC%E4%BA%8B%E4%BB%B6"
 
 # Class START ----------------------------------------------------------------------------------
 class MetaData :
@@ -35,7 +37,7 @@ class MetaData :
         return
 # Class END ----------------------------------------------------------------------------------
 
-def getSearchTargetURLs(baseURL) :
+def getSearchTargetURLs(baseURL, latestId) :
 
     pageUrls = []
 
@@ -73,17 +75,68 @@ def getSearchTargetURLs(baseURL) :
         return None
 
     pageCount = int((txts[-1] - 1) / 30)
+    pprint(pageCount)
     pageCount += 1
 
-    for i in range(pageCount) :
-        pageNum = 1 + (i * 30)
+    pprint(txts)
+    pprint(pageCount)
+
+    startPage = latestId // 30
+
+    for i in range(startPage, pageCount) :
+        pageNum = txts[i]
         pageUrl = baseBbsUrl + '/' + str(pageNum) + '-'
         pageUrls.append(pageUrl)
 
     return pageUrls
 
-def GetAllResInPage() :
-    return
+def GetAllResInPage(tgtUrl) :
+    # 対象URL
+    r = requests.get(tgtUrl)
+
+    # 第一引数＝解析対象　第二引数＝パーサー(何を元に解析するか：この場合はHTML)
+    soup = BeautifulSoup(r.content, "html.parser")
+
+    resAll = soup.select("dl")
+    # print(resAll)
+
+    resheads = soup.find_all("dt", class_="reshead")
+    resbodys = soup.find_all("dd", class_="resbody")
+
+    formattedHead = []
+    formattedBody = []
+    resCount = 0
+
+    # 整形済みレスヘッダ部取得
+    for rhead in resheads:
+        h = rhead
+        h = h.getText()  # テキスト部分抽出
+        h = h.replace('\n', '')  # 不要な改行を削除
+        h = h.replace(' ', '')  # 不要な空白を削除
+        h = h.replace(')', ') ')  # 整形
+        h = h.replace('ID:', ' ID:')  # 整形
+        formattedHead.append(h)
+
+        # 当該レスのID番号を取得する
+
+        # 整形済みレスヘッダ先頭の数値要素を取得(正規表現)
+        repat = re.compile('^[0-9]*')
+        thisId = repat.match(h)
+
+        # 当該レスID番号取得(この時点における最新ID)
+        latestId = int(thisId.group())
+
+    # 整形済みレス本体部取得
+    for rbody in resbodys:
+        b = rbody
+        b = b.getText()
+        b = b.strip()  # 前後から空白削除
+        b = b.strip('\n')  # 前後から改行削除
+        formattedBody.append(b)
+        # カウントするのはheadでもbodyでもどちらでもいいのだが、この数が本ページにおけるレス数になる(通常は30だが最終ページでは少ない可能性あり)
+        resCount += 1
+
+    return resCount, formattedHead, formattedBody
 
 def CreateMainFile() :
     return
@@ -109,6 +162,18 @@ def TeeOutput(text, file) :
     file.write(text + '\n')
     return
 
+def GetLatestID(fName):
+    try:
+        cmnd = ['head', '-1', fName]
+        subResult = subprocess.check_output(cmnd)
+    except:
+        print("Error.")
+
+    heads = subResult.split()
+    id = int(heads[2])
+
+    return id
+
 # メイン処理スタート -----------------------------------------------------------------
 
 JST = timezone(timedelta(hours=+9), 'JST')
@@ -133,77 +198,41 @@ pediLogFileName = pageTitle + ".txt"
 tmpMainFile = nowstamp + '.main' + '.tmp'
 
 # 対象ファイル削除 --------------------------------------------
-if os.path.exists(tmpMainFile ) :
-    os.remove(tmpMainFile )
+if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
 # 対象ファイル削除 --------------------------------------------
 
 metas = MetaData()
 
 # 対象記事へのログファイルが既に存在するかチェック。
-if os.path.exists(tmpMainFile ) :
+if os.path.exists(pediLogFileName) :
     print("Found log file.")
+    latestId = GetLatestID(pediLogFileName)
     openMode = 'a'
-    writer = open(tmpMainFile, openMode)
-#    writer = AppendLogFile(tmpMainFile , metas)
+    shutil.copyfile(pediLogFileName, tmpMainFile)
+#   writer = AppendLogFile(tmpMainFile , metas)
 else :
     print("Not found log file.")
+    latestId = 0
     openMode = 'w'
-    writer = open(tmpMainFile , openMode)
-    TeeOutput(pageTitle + '\n', writer)
-#    writer = CreateLogFile(tmpMainFile , metas)
+#   writer = CreateLogFile(tmpMainFile , metas)
 
-targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL)
+writer = open(tmpMainFile, openMode)
 
-latestId = 0
+if openMode == 'w' : TeeOutput(pageTitle + '\n', writer)
+
+targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL, latestId)
+
+if targetURLs == None :
+    print("Nothing any response in Article")
+    sys.exit(0)
+
+pprint(targetURLs)
 
 for url in targetURLs:
-    # print(url)
 
-    # 対象URL
-    r = requests.get(url)
+    resCount, formattedHead, formattedBody = GetAllResInPage(url)
 
-    # 第一引数＝解析対象　第二引数＝パーサー(何を元に解析するか：この場合はHTML)
-    soup = BeautifulSoup(r.content, "html.parser")
-
-    resAll = soup.select("dl")
-    # print(resAll)
-
-    resheads = soup.find_all("dt", class_="reshead")
-    resbodys = soup.find_all("dd", class_="resbody")
-
-    formattedHead = []
-    formattedBody = []
-    resCount = 0
     i = 0
-
-    # 整形済みレスヘッダ部取得
-    for rhead in resheads :
-        h = rhead
-        h = h.getText()         # テキスト部分抽出
-        h = h.replace('\n', '') # 不要な改行を削除
-        h = h.replace(' ', '')  # 不要な空白を削除
-        h = h.replace(')', ') ')        # 整形
-        h = h.replace('ID:', ' ID:')    # 整形
-        formattedHead.append(h)
-
-        # 当該レスのID番号を取得する
-
-        # 整形済みレスヘッダ先頭の数値要素を取得(正規表現)
-        repat = re.compile('^[0-9]*')
-        thisId = repat.match(h)
-
-        # 当該レスID番号取得(この時点における最新ID)
-        latestId = int(thisId.group())
-
-    # 整形済みレス本体部取得
-    for rbody in resbodys :
-        b = rbody
-        b = b.getText()
-        b = b.strip()       # 前後から空白削除
-        b = b.strip('\n')   # 前後から改行削除
-        formattedBody.append(b)
-        # カウントするのはheadでもbodyでもどちらでもいいのだが、この数が本ページにおけるレス数になる(通常は30だが最終ページでは少ない可能性あり)
-        resCount += 1
 
     # ヘッダ+本体の形で順に出力する。
     for i in range(resCount):
@@ -211,13 +240,18 @@ for url in targetURLs:
         TeeOutput(formattedBody[i], writer)
         TeeOutput("", writer)
 
-    if (latestId > 20) :
-        break
+    latestId += resCount
+
+    # if (latestId > 20) :
+    #     break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
 writer.close()
+
+# q, mod = divmod(latestId, 30)
+# print(q, mod)
 
 # --------------------------------------------------------------
 # 一時ヘッダーファイル用意
@@ -261,6 +295,6 @@ print(wc[0].decode("utf-8"))
 print(wc[1].decode("utf-8"))
 print(wc[2].decode("utf-8"))
 
-
 # メイン処理エンド -----------------------------------------------------------------
+
 
