@@ -10,32 +10,11 @@ import subprocess
 import sys
 import shutil
 
+RES_IN_SINGLEPAGE = 30
 SCRAPING_INTERVAL_TIME = 3
 
 TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
 # TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/9.25%E3%81%91%E3%82%82%E3%83%95%E3%83%AC%E4%BA%8B%E4%BB%B6"
-
-# Class START ----------------------------------------------------------------------------------
-class MetaData :
-
-    metaItems = {'updated':'UPDATE', 'threadId':'Thread ID', 'lastId':'Last ID'}
-
-    # メタデータの項目部分を設定する
-    def SetMetaTemplate(self, writer) :
-        TeeOutput(self.metaItems['updated'],    writer)
-        TeeOutput(self.metaItems['threadId'],   writer)
-        TeeOutput(self.metaItems['lastId'],     writer)
-
-        return
-
-    # 対象ファイルへメタデータの値を入力する
-    def SetMetaData(self) :
-        return
-
-    # 対象ファイルのメタデータの値を取得する
-    def GetMetaData(self) :
-        return
-# Class END ----------------------------------------------------------------------------------
 
 def getSearchTargetURLs(baseURL, latestId) :
 
@@ -49,7 +28,6 @@ def getSearchTargetURLs(baseURL, latestId) :
 
     # 記事本体のURLと掲示板用URLは微妙に異なるため修正。
     baseBbsUrl = baseURL.replace('/a/', '/b/a/')
-    # print(baseBbsUrl)
 
     # ここまでで同一内容のpager[0], pager[1]が手に入る。
 
@@ -74,14 +52,14 @@ def getSearchTargetURLs(baseURL, latestId) :
     if len(txts) == 0 :
         return None
 
-    pageCount = int((txts[-1] - 1) / 30)
-    pprint(pageCount)
+    pageCount = int((txts[-1] - 1) / RES_IN_SINGLEPAGE)
+    # pprint(pageCount)
     pageCount += 1
 
-    pprint(txts)
-    pprint(pageCount)
+    # pprint(txts)
+    # pprint(pageCount)
 
-    startPage = latestId // 30
+    startPage = latestId // RES_IN_SINGLEPAGE
 
     for i in range(startPage, pageCount) :
         pageNum = txts[i]
@@ -97,7 +75,7 @@ def GetAllResInPage(tgtUrl) :
     # 第一引数＝解析対象　第二引数＝パーサー(何を元に解析するか：この場合はHTML)
     soup = BeautifulSoup(r.content, "html.parser")
 
-    resAll = soup.select("dl")
+    # resAll = soup.select("dl")
     # print(resAll)
 
     resheads = soup.find_all("dt", class_="reshead")
@@ -120,11 +98,10 @@ def GetAllResInPage(tgtUrl) :
         # 当該レスのID番号を取得する
 
         # 整形済みレスヘッダ先頭の数値要素を取得(正規表現)
-        repat = re.compile('^[0-9]*')
-        thisId = repat.match(h)
-
+        # repat = re.compile('^[0-9]*')
+        # thisId = repat.match(h)
         # 当該レスID番号取得(この時点における最新ID)
-        latestId = int(thisId.group())
+        # latestId = int(thisId.group())
 
     # 整形済みレス本体部取得
     for rbody in resbodys:
@@ -137,24 +114,6 @@ def GetAllResInPage(tgtUrl) :
         resCount += 1
 
     return resCount, formattedHead, formattedBody
-
-def CreateMainFile() :
-    return
-
-def CreateMetaFile() :
-    return
-
-# ログ新規作成時の動作
-def CreateLogFile(pediLogFileName, mt) :
-    writer = open(pediLogFileName, 'w')
-    mt.SetMetaTemplate(writer)
-    return writer
-
-# ログ追記時の動作
-def AppendLogFile(pediLogFileName, mt) :
-    mt.GetMetaData()
-    writer = open(pediLogFileName, 'a')
-    return writer
 
 # 標準出力とファイル出力を同時に行う。
 def TeeOutput(text, file) :
@@ -198,10 +157,8 @@ pediLogFileName = pageTitle + ".txt"
 tmpMainFile = nowstamp + '.main' + '.tmp'
 
 # 対象ファイル削除 --------------------------------------------
-if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
+# if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
 # 対象ファイル削除 --------------------------------------------
-
-metas = MetaData()
 
 # 対象記事へのログファイルが既に存在するかチェック。
 if os.path.exists(pediLogFileName) :
@@ -209,12 +166,11 @@ if os.path.exists(pediLogFileName) :
     latestId = GetLatestID(pediLogFileName)
     openMode = 'a'
     shutil.copyfile(pediLogFileName, tmpMainFile)
-#   writer = AppendLogFile(tmpMainFile , metas)
+
 else :
     print("Not found log file.")
     latestId = 0
     openMode = 'w'
-#   writer = CreateLogFile(tmpMainFile , metas)
 
 writer = open(tmpMainFile, openMode)
 
@@ -232,15 +188,14 @@ for url in targetURLs:
 
     resCount, formattedHead, formattedBody = GetAllResInPage(url)
 
-    i = 0
+    mark = (latestId % RES_IN_SINGLEPAGE)
 
     # ヘッダ+本体の形で順に出力する。
-    for i in range(resCount):
+    for i in range(mark, resCount):
         TeeOutput(formattedHead[i], writer)
         TeeOutput(formattedBody[i], writer)
         TeeOutput("", writer)
-
-    latestId += resCount
+        latestId += 1
 
     # if (latestId > 20) :
     #     break
@@ -249,9 +204,6 @@ for url in targetURLs:
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
 writer.close()
-
-# q, mod = divmod(latestId, 30)
-# print(q, mod)
 
 # --------------------------------------------------------------
 # 一時ヘッダーファイル用意
@@ -263,37 +215,13 @@ metaInfoLine = ' '.join(metaInfo)
 TeeOutput(metaInfoLine, writer)
 writer.close()
 # --------------------------------------------------------------
-
-# --------------------------------------------------------------
 # 一時ヘッダ・一時メインファイルの結合。最終ログファイルを出力（シェルスクリプトで実装）
 cmnd = ['./CatFiles.sh', tmpHeadFile, tmpMainFile, pediLogFileName]
 subResult = subprocess.call(cmnd)
 # --------------------------------------------------------------
 
-try:
-    cmnd = ['wc', '-l', pediLogFileName]
-    subResult = subprocess.check_output(cmnd)
-except:
-    print("Error.")
-
-print(subResult)
-
-wc = subResult.split()
-pprint(wc)
-print(wc[0].decode("utf-8"))
-
-try:
-    cmnd = ['head', '-1', pediLogFileName]
-    subResult = subprocess.check_output(cmnd)
-except:
-    print("Error.")
-
-print(subResult)
-
-wc = subResult.split()
-print(wc[0].decode("utf-8"))
-print(wc[1].decode("utf-8"))
-print(wc[2].decode("utf-8"))
+print("Page Name =", pageTitle)
+print("Latest ID =", latestId)
 
 # メイン処理エンド -----------------------------------------------------------------
 
