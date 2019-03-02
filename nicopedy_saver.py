@@ -13,7 +13,7 @@ import shutil
 RES_IN_SINGLEPAGE = 30
 SCRAPING_INTERVAL_TIME = 6
 
-TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
+TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
 
 def getSearchTargetURLs(baseURL, latestId) :
 
@@ -77,10 +77,6 @@ def GetAllResInPage(tgtUrl) :
     # 第一引数＝解析対象　第二引数＝パーサー(何を元に解析するか：この場合はHTML)
     soup = BeautifulSoup(r.content, "html.parser")
 
-    # resAll = soup.select("dl")
-    # print(resAll)
-
-
     resheads = soup.find_all("dt", class_="reshead")
     resbodys = soup.find_all("dd", class_="resbody")
 
@@ -98,16 +94,7 @@ def GetAllResInPage(tgtUrl) :
         h = h.replace('ID:', ' ID:')  # 整形
         formattedHead.append(h)
 
-        # 当該レスのID番号を取得する
-
-        # 整形済みレスヘッダ先頭の数値要素を取得(正規表現)
-        # repat = re.compile('^[0-9]*')
-        # thisId = repat.match(h)
-        # 当該レスID番号取得(この時点における最新ID)
-        # latestId = int(thisId.group())
-
     # 整形済みレス本体部取得
-    i = 0
     for rbody in resbodys:
         b = rbody
         b = b.getText()
@@ -201,8 +188,9 @@ for url in targetURLs:
         TeeOutput("", writer)
         latestId += 1
 
-    # if (latestId > 10) :
-    #     break
+    # 動作検証中は最初のログを取ったところで止める。
+    if (latestId > 10) :
+        break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
