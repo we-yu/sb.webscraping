@@ -11,10 +11,9 @@ import sys
 import shutil
 
 RES_IN_SINGLEPAGE = 30
-SCRAPING_INTERVAL_TIME = 3
+SCRAPING_INTERVAL_TIME = 6
 
 TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
-# TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/9.25%E3%81%91%E3%82%82%E3%83%95%E3%83%AC%E4%BA%8B%E4%BB%B6"
 
 def getSearchTargetURLs(baseURL, latestId) :
 
@@ -23,14 +22,14 @@ def getSearchTargetURLs(baseURL, latestId) :
     # 対象記事トップへ移動し、HTMLパーサーで見る。
     tgtPage = requests.get(baseURL)
     soup = BeautifulSoup(tgtPage.content, "html.parser")
+
     # ページャー部分を取得。
     pagers = soup.select("div.pager")
 
     # 記事本体のURLと掲示板用URLは微妙に異なるため修正。
     baseBbsUrl = baseURL.replace('/a/', '/b/a/')
 
-    # ここまでで同一内容のpager[0], pager[1]が手に入る。
-
+    # ここまでで同一内容のpager[0], pager[1]が手に入る。(ページネイション項目が二箇所あるため)
     pager = pagers[0]
 
     # テキスト部分の取得
@@ -49,11 +48,14 @@ def getSearchTargetURLs(baseURL, latestId) :
         if v == '' : continue       # 要素が空白だった（整数がなかった）場合はスキップ
         txts.append(int(v))         # 整数値は最終配列へ格納。
 
+    # レスが存在しない場合はNone
     if len(txts) == 0 :
         return None
 
+    # ページは30*n+1で始まるので、「最後の要素から-1した値」を取ると最後のページ数がわかる。念の為Int化。
+    # print(len(txts), txts[-1])
     pageCount = int((txts[-1] - 1) / RES_IN_SINGLEPAGE)
-    # pprint(pageCount)
+    print(pageCount)
     pageCount += 1
 
     # pprint(txts)
@@ -77,6 +79,7 @@ def GetAllResInPage(tgtUrl) :
 
     # resAll = soup.select("dl")
     # print(resAll)
+
 
     resheads = soup.find_all("dt", class_="reshead")
     resbodys = soup.find_all("dd", class_="resbody")
@@ -104,6 +107,7 @@ def GetAllResInPage(tgtUrl) :
         # latestId = int(thisId.group())
 
     # 整形済みレス本体部取得
+    i = 0
     for rbody in resbodys:
         b = rbody
         b = b.getText()
@@ -157,7 +161,7 @@ pediLogFileName = pageTitle + ".txt"
 tmpMainFile = nowstamp + '.main' + '.tmp'
 
 # 対象ファイル削除 --------------------------------------------
-# if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
+if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
 # 対象ファイル削除 --------------------------------------------
 
 # 対象記事へのログファイルが既に存在するかチェック。
@@ -197,7 +201,7 @@ for url in targetURLs:
         TeeOutput("", writer)
         latestId += 1
 
-    # if (latestId > 20) :
+    # if (latestId > 10) :
     #     break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
