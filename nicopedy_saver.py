@@ -9,13 +9,22 @@ from datetime import datetime, timedelta, timezone
 import subprocess
 import sys
 import shutil
+import string
 
 RES_IN_SINGLEPAGE = 30
 SCRAPING_INTERVAL_TIME = 6
 
-TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
+NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
+TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
+# TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
 
-def getSearchTargetURLs(baseURL, latestId) :
+def IsValidURL(targetURL) :
+    isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
+
+    print(isValid)
+    return isValid
+
+def GetSearchTargetURLs(baseURL, latestId) :
 
     pageUrls = []
 
@@ -96,8 +105,8 @@ def GetAllResInPage(tgtUrl) :
 
     # 整形済みレス本体部取得
     for rbody in resbodys:
-        b = rbody
-        b = b.getText()
+        b = str(rbody).replace("<br/>", "\n")  # changed here
+        b = BeautifulSoup(b, "html.parser").getText()
         b = b.strip()  # 前後から空白削除
         b = b.strip('\n')  # 前後から改行削除
         formattedBody.append(b)
@@ -125,6 +134,12 @@ def GetLatestID(fName):
     return id
 
 # メイン処理スタート -----------------------------------------------------------------
+
+tgtArtUrl = TARGET_ARTICLE_URL
+
+if not IsValidURL(tgtArtUrl) :
+    print( TARGET_ARTICLE_URL, ": This is not valid URL. Target URL should be under", NICOPEDI_URL_HEAD)
+    sys.exit(0)
 
 JST = timezone(timedelta(hours=+9), 'JST')
 now = datetime.now(JST)
@@ -167,7 +182,7 @@ writer = open(tmpMainFile, openMode)
 
 if openMode == 'w' : TeeOutput(pageTitle + '\n', writer)
 
-targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL, latestId)
+targetURLs = GetSearchTargetURLs(TARGET_ARTICLE_URL, latestId)
 
 if targetURLs == None :
     print("Nothing any response in Article")
@@ -189,8 +204,8 @@ for url in targetURLs:
         latestId += 1
 
     # 動作検証中は最初のログを取ったところで止める。
-    if (latestId > 10) :
-        break
+    # if (latestId > 10) :
+    #     break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
