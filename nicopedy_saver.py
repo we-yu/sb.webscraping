@@ -15,8 +15,8 @@ RES_IN_SINGLEPAGE = 30
 SCRAPING_INTERVAL_TIME = 6
 
 NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
-TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E5%8F%A4%E8%B3%80%E8%91%B5"
-# TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
+TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E3%83%90%E3%83%AC%E3%83%83%E3%83%88m82"
+# tgtArtUrl = "https://dic.nicovideo.jp/a/python"
 
 def IsValidURL(targetURL) :
     isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
@@ -35,14 +35,17 @@ def GetSearchTargetURLs(baseURL, latestId) :
     # ページャー部分を取得。
     pagers = soup.select("div.pager")
 
-    # 記事本体のURLと掲示板用URLは微妙に異なるため修正。
-    baseBbsUrl = baseURL.replace('/a/', '/b/a/')
+    # ここで<a class="navi"のものは除外スべき。
 
     # ここまでで同一内容のpager[0], pager[1]が手に入る。(ページネイション項目が二箇所あるため)
     pager = pagers[0]
 
+    print(pager)
+
     # テキスト部分の取得
     pager = pager.getText()
+
+    print(pager)
 
     # 余計な空白の削除
     splitedTxt = pager.strip()
@@ -56,6 +59,8 @@ def GetSearchTargetURLs(baseURL, latestId) :
         v = re.sub(r'\D', '', txt)  # 当該要素内から整数部分を抽出
         if v == '' : continue       # 要素が空白だった（整数がなかった）場合はスキップ
         txts.append(int(v))         # 整数値は最終配列へ格納。
+
+    print(txts)
 
     # レスが存在しない場合はNone
     if len(txts) == 0 :
@@ -71,6 +76,9 @@ def GetSearchTargetURLs(baseURL, latestId) :
     # pprint(pageCount)
 
     startPage = latestId // RES_IN_SINGLEPAGE
+
+    # 記事本体のURLと掲示板用URLは微妙に異なるため修正。
+    baseBbsUrl = baseURL.replace('/a/', '/b/a/')
 
     for i in range(startPage, pageCount) :
         pageNum = txts[i]
@@ -137,15 +145,24 @@ def GetLatestID(fName):
 
 tgtArtUrl = TARGET_ARTICLE_URL
 
+# args = sys.argv
+#
+# if not args[1] :
+#     print("Nothing target URL")
+#     sys.exit(0)
+#
+# tgtArtUrl = args[1]
+
+# URLがニコ百科として不正な場合は終了
 if not IsValidURL(tgtArtUrl) :
-    print( TARGET_ARTICLE_URL, ": This is not valid URL. Target URL should be under", NICOPEDI_URL_HEAD)
+    print( tgtArtUrl, ": This is not valid URL. Target URL should be under", NICOPEDI_URL_HEAD)
     sys.exit(0)
 
 JST = timezone(timedelta(hours=+9), 'JST')
 now = datetime.now(JST)
 nowstamp = str(round(now.timestamp()))
 
-art_req = requests.get(TARGET_ARTICLE_URL)
+art_req = requests.get(tgtArtUrl)
 art_soup = BeautifulSoup(art_req.content, 'html.parser')
 
 # 取得したデータからカテゴリー要素を削除
@@ -182,7 +199,7 @@ writer = open(tmpMainFile, openMode)
 
 if openMode == 'w' : TeeOutput(pageTitle + '\n', writer)
 
-targetURLs = GetSearchTargetURLs(TARGET_ARTICLE_URL, latestId)
+targetURLs = GetSearchTargetURLs(tgtArtUrl, latestId)
 
 if targetURLs == None :
     print("Nothing any response in Article")
