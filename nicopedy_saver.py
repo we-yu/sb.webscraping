@@ -20,8 +20,6 @@ TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E3%83%90%E3%83%AC%E3%83%83%E3%
 
 def IsValidURL(targetURL) :
     isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
-
-    print(isValid)
     return isValid
 
 def GetSearchTargetURLs(baseURL, latestId) :
@@ -32,20 +30,17 @@ def GetSearchTargetURLs(baseURL, latestId) :
     tgtPage = requests.get(baseURL)
     soup = BeautifulSoup(tgtPage.content, "html.parser")
 
+    # 記事タイトルが半角数値を含むとNaviタグの項目を拾ってしまうため除外
+    soup.find('a', class_='navi').decompose()
+
     # ページャー部分を取得。
     pagers = soup.select("div.pager")
-
-    # ここで<a class="navi"のものは除外スべき。
 
     # ここまでで同一内容のpager[0], pager[1]が手に入る。(ページネイション項目が二箇所あるため)
     pager = pagers[0]
 
-    print(pager)
-
     # テキスト部分の取得
     pager = pager.getText()
-
-    print(pager)
 
     # 余計な空白の削除
     splitedTxt = pager.strip()
@@ -60,8 +55,6 @@ def GetSearchTargetURLs(baseURL, latestId) :
         if v == '' : continue       # 要素が空白だった（整数がなかった）場合はスキップ
         txts.append(int(v))         # 整数値は最終配列へ格納。
 
-    print(txts)
-
     # レスが存在しない場合はNone
     if len(txts) == 0 :
         return None
@@ -69,11 +62,7 @@ def GetSearchTargetURLs(baseURL, latestId) :
     # ページは30*n+1で始まるので、「最後の要素から-1した値」を取ると最後のページ数がわかる。念の為Int化。
     # print(len(txts), txts[-1])
     pageCount = int((txts[-1] - 1) / RES_IN_SINGLEPAGE)
-    print(pageCount)
     pageCount += 1
-
-    # pprint(txts)
-    # pprint(pageCount)
 
     startPage = latestId // RES_IN_SINGLEPAGE
 
@@ -84,8 +73,6 @@ def GetSearchTargetURLs(baseURL, latestId) :
         pageNum = txts[i]
         pageUrl = baseBbsUrl + '/' + str(pageNum) + '-'
         pageUrls.append(pageUrl)
-
-        ####
 
     return pageUrls
 
@@ -207,7 +194,7 @@ if targetURLs == None :
     print("Nothing any response in Article")
     sys.exit(0)
 
-pprint(targetURLs)
+# pprint(targetURLs)
 
 for url in targetURLs:
 
