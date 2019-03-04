@@ -9,18 +9,30 @@ from datetime import datetime, timedelta, timezone
 import subprocess
 import sys
 import shutil
+from functools import partial
 
 RES_IN_SINGLEPAGE = 30
-SCRAPING_INTERVAL_TIME = 6
+SCRAPING_INTERVAL_TIME = 3
 
 NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
 
 TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
 
+# テキスト色変え用
+def print_colored(code, text, is_bold=False):
+    if is_bold:
+        code = '1;%s' % code
+
+    print('\033[%sm%s\033[0m' % (code, text))
+
+print_red = partial(print_colored, '31')
+
+# 入力したURLがニコニコ大百科内のものかチェック
 def IsValidURL(targetURL) :
     isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
     return isValid
 
+# メイン記事のページャー部分からスクレイピング対象になる掲示板URLを取得する（既に取得済みの場合はそのIDからスタート）
 def GetSearchTargetURLs(baseURL, latestId) :
 
     pageUrls = []
@@ -68,13 +80,17 @@ def GetSearchTargetURLs(baseURL, latestId) :
     # 記事本体のURLと掲示板用URLは微妙に異なるため修正。
     baseBbsUrl = baseURL.replace('/a/', '/b/a/')
 
+    print(startPage, pageCount)
+    pprint(txts)
     for i in range(startPage, pageCount) :
-        pageNum = txts[i]
+        # print(txts[i])
+        pageNum = i * RES_IN_SINGLEPAGE + 1
         pageUrl = baseBbsUrl + '/' + str(pageNum) + '-'
         pageUrls.append(pageUrl)
 
     return pageUrls
 
+# 対象掲示板ページから全レスを取得する。
 def GetAllResInPage(tgtUrl) :
     # 対象URL
     r = requests.get(tgtUrl)
@@ -135,15 +151,16 @@ tgtArtUrl = TARGET_ARTICLE_URL
 
 args = sys.argv
 
-if not args[1] :
-    print("Nothing target URL")
+if len(args) <= 1 :
+    print_red('Nothing Target URL', is_bold=True)
     sys.exit(0)
 
 tgtArtUrl = args[1]
 
 # URLがニコ百科として不正な場合は終了
 if not IsValidURL(tgtArtUrl) :
-    print( tgtArtUrl, ": This is not valid URL. Target URL should be under", NICOPEDI_URL_HEAD)
+    print_red('This is not valid URL.', is_bold=True)
+    print('Target URL should be under', NICOPEDI_URL_HEAD)
     sys.exit(0)
 
 JST = timezone(timedelta(hours=+9), 'JST')
@@ -195,6 +212,8 @@ if targetURLs == None :
 
 # pprint(targetURLs)
 
+print('Progress ... ', end='', flush=True)
+
 for url in targetURLs:
 
     resCount, formattedHead, formattedBody = GetAllResInPage(url)
@@ -208,6 +227,8 @@ for url in targetURLs:
         TeeOutput("", writer)
         latestId += 1
 
+    print(latestId, end=' ', flush=True)
+
     # 動作検証中は最初のログを取ったところで止める。
     # if (latestId > 10) :
     #     break
@@ -215,6 +236,7 @@ for url in targetURLs:
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
+print()
 writer.close()
 
 # --------------------------------------------------------------
