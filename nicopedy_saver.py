@@ -9,14 +9,13 @@ from datetime import datetime, timedelta, timezone
 import subprocess
 import sys
 import shutil
-import string
 
 RES_IN_SINGLEPAGE = 30
 SCRAPING_INTERVAL_TIME = 6
 
 NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
-TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E3%83%90%E3%83%AC%E3%83%83%E3%83%88m82"
-# tgtArtUrl = "https://dic.nicovideo.jp/a/python"
+
+TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
 
 def IsValidURL(targetURL) :
     isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
@@ -134,13 +133,13 @@ def GetLatestID(fName):
 
 tgtArtUrl = TARGET_ARTICLE_URL
 
-# args = sys.argv
-#
-# if not args[1] :
-#     print("Nothing target URL")
-#     sys.exit(0)
-#
-# tgtArtUrl = args[1]
+args = sys.argv
+
+if not args[1] :
+    print("Nothing target URL")
+    sys.exit(0)
+
+tgtArtUrl = args[1]
 
 # URLがニコ百科として不正な場合は終了
 if not IsValidURL(tgtArtUrl) :
