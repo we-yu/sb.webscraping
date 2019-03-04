@@ -9,13 +9,20 @@ from datetime import datetime, timedelta, timezone
 import subprocess
 import sys
 import shutil
+import string
 
 RES_IN_SINGLEPAGE = 30
 SCRAPING_INTERVAL_TIME = 6
 
-TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
+NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
+TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/%E3%83%90%E3%83%AC%E3%83%83%E3%83%88m82"
+# tgtArtUrl = "https://dic.nicovideo.jp/a/python"
 
-def getSearchTargetURLs(baseURL, latestId) :
+def IsValidURL(targetURL) :
+    isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
+    return isValid
+
+def GetSearchTargetURLs(baseURL, latestId) :
 
     pageUrls = []
 
@@ -23,11 +30,11 @@ def getSearchTargetURLs(baseURL, latestId) :
     tgtPage = requests.get(baseURL)
     soup = BeautifulSoup(tgtPage.content, "html.parser")
 
+    # 記事タイトルが半角数値を含むとNaviタグの項目を拾ってしまうため除外
+    soup.find('a', class_='navi').decompose()
+
     # ページャー部分を取得。
     pagers = soup.select("div.pager")
-
-    # 記事本体のURLと掲示板用URLは微妙に異なるため修正。
-    baseBbsUrl = baseURL.replace('/a/', '/b/a/')
 
     # ここまでで同一内容のpager[0], pager[1]が手に入る。(ページネイション項目が二箇所あるため)
     pager = pagers[0]
@@ -55,13 +62,12 @@ def getSearchTargetURLs(baseURL, latestId) :
     # ページは30*n+1で始まるので、「最後の要素から-1した値」を取ると最後のページ数がわかる。念の為Int化。
     # print(len(txts), txts[-1])
     pageCount = int((txts[-1] - 1) / RES_IN_SINGLEPAGE)
-    print(pageCount)
     pageCount += 1
 
-    # pprint(txts)
-    # pprint(pageCount)
-
     startPage = latestId // RES_IN_SINGLEPAGE
+
+    # 記事本体のURLと掲示板用URLは微妙に異なるため修正。
+    baseBbsUrl = baseURL.replace('/a/', '/b/a/')
 
     for i in range(startPage, pageCount) :
         pageNum = txts[i]
@@ -96,8 +102,8 @@ def GetAllResInPage(tgtUrl) :
 
     # 整形済みレス本体部取得
     for rbody in resbodys:
-        b = rbody
-        b = b.getText()
+        b = str(rbody).replace("<br/>", "\n")  # changed here
+        b = BeautifulSoup(b, "html.parser").getText()
         b = b.strip()  # 前後から空白削除
         b = b.strip('\n')  # 前後から改行削除
         formattedBody.append(b)
@@ -126,11 +132,26 @@ def GetLatestID(fName):
 
 # メイン処理スタート -----------------------------------------------------------------
 
+tgtArtUrl = TARGET_ARTICLE_URL
+
+# args = sys.argv
+#
+# if not args[1] :
+#     print("Nothing target URL")
+#     sys.exit(0)
+#
+# tgtArtUrl = args[1]
+
+# URLがニコ百科として不正な場合は終了
+if not IsValidURL(tgtArtUrl) :
+    print( tgtArtUrl, ": This is not valid URL. Target URL should be under", NICOPEDI_URL_HEAD)
+    sys.exit(0)
+
 JST = timezone(timedelta(hours=+9), 'JST')
 now = datetime.now(JST)
 nowstamp = str(round(now.timestamp()))
 
-art_req = requests.get(TARGET_ARTICLE_URL)
+art_req = requests.get(tgtArtUrl)
 art_soup = BeautifulSoup(art_req.content, 'html.parser')
 
 # 取得したデータからカテゴリー要素を削除
@@ -167,13 +188,13 @@ writer = open(tmpMainFile, openMode)
 
 if openMode == 'w' : TeeOutput(pageTitle + '\n', writer)
 
-targetURLs = getSearchTargetURLs(TARGET_ARTICLE_URL, latestId)
+targetURLs = GetSearchTargetURLs(tgtArtUrl, latestId)
 
 if targetURLs == None :
     print("Nothing any response in Article")
     sys.exit(0)
 
-pprint(targetURLs)
+# pprint(targetURLs)
 
 for url in targetURLs:
 
@@ -189,8 +210,8 @@ for url in targetURLs:
         latestId += 1
 
     # 動作検証中は最初のログを取ったところで止める。
-    if (latestId > 10) :
-        break
+    # if (latestId > 10) :
+    #     break
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
