@@ -85,6 +85,8 @@ def GetSearchTargetURLs(baseURL, latestId) :
         pageUrl = baseBbsUrl + '/' + str(pageNum) + '-'
         pageUrls.append(pageUrl)
 
+        ####
+
     return pageUrls
 
 def GetAllResInPage(tgtUrl) :
