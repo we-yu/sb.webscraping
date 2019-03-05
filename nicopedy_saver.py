@@ -177,6 +177,8 @@ titleTxt = art_soup.find('h1', class_='article-title')
 
 # タイトル部のテキストを取得(記事タイトルになる)
 pageTitle = titleTxt.getText()
+# 半角スペースが入っていると面倒なので置換
+pageTitle = pageTitle.replace(' ', '_')
 
 # ログファイル名は「(記事タイトル).txt」
 pediLogFileName = pageTitle + ".txt"
@@ -204,6 +206,8 @@ writer = open(tmpMainFile, openMode)
 
 if openMode == 'w' : TeeOutput(pageTitle + '\n', writer)
 
+writer.close()
+
 targetURLs = GetSearchTargetURLs(tgtArtUrl, latestId)
 
 if targetURLs == None :
@@ -216,28 +220,31 @@ print('Progress ... ', end='', flush=True)
 
 for url in targetURLs:
 
-    resCount, formattedHead, formattedBody = GetAllResInPage(url)
+    # インターバル中にファイルを掴みっぱなしなのは気持ち悪いからURL毎にオープン・クローズするだけ。
+    with open(tmpMainFile, 'a') as writer:
 
-    mark = (latestId % RES_IN_SINGLEPAGE)
+        resCount, formattedHead, formattedBody = GetAllResInPage(url)
 
-    # ヘッダ+本体の形で順に出力する。
-    for i in range(mark, resCount):
-        TeeOutput(formattedHead[i], writer)
-        TeeOutput(formattedBody[i], writer)
-        TeeOutput("", writer)
-        latestId += 1
+        mark = (latestId % RES_IN_SINGLEPAGE)
+        print('[', mark, resCount, ']', end=' ', flush=True)
 
-    print(latestId, end=' ', flush=True)
+        # ヘッダ+本体の形で順に出力する。
+        for i in range(mark, resCount):
+            TeeOutput(formattedHead[i], writer)
+            TeeOutput(formattedBody[i], writer)
+            TeeOutput("", writer)
+            latestId += 1
 
-    # 動作検証中は最初のログを取ったところで止める。
-    # if (latestId > 10) :
-    #     break
+        # 動作検証中は最初のログを取ったところで止める。
+        # if (latestId > 10) :
+        #     break
+
+        # print(latestId, end=' ', flush=True)
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
 
 print()
-writer.close()
 
 # --------------------------------------------------------------
 # 一時ヘッダーファイル用意
