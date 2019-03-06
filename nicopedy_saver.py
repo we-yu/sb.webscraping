@@ -12,25 +12,23 @@ import shutil
 from functools import partial
 
 RES_IN_SINGLEPAGE = 30
+LOG_STORE_DIRECTORY = 'logs'
 SCRAPING_INTERVAL_TIME = 3
 
 NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
 
 TARGET_ARTICLE_URL = "https://dic.nicovideo.jp/a/python"
 
-# テキスト色変え用
-def print_colored(code, text, is_bold=False):
-    if is_bold:
-        code = '1;%s' % code
+def CheckCreateDirectory(location, dirName) :
 
-    print('\033[%sm%s\033[0m' % (code, text))
+    relativePath = location + '/' + dirName
 
-print_red = partial(print_colored, '31')
+    if not os.path.exists(relativePath) :
+        # ディレクトリが存在しない場合は作成
+        os.mkdir(relativePath)
+        print('Create',relativePath)
 
-# 入力したURLがニコニコ大百科内のものかチェック
-def IsValidURL(targetURL) :
-    isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
-    return isValid
+    return relativePath
 
 # メイン記事のページャー部分からスクレイピング対象になる掲示板URLを取得する（既に取得済みの場合はそのIDからスタート）
 def GetSearchTargetURLs(baseURL, latestId) :
@@ -83,7 +81,6 @@ def GetSearchTargetURLs(baseURL, latestId) :
     print(startPage, pageCount)
     pprint(txts)
     for i in range(startPage, pageCount) :
-        # print(txts[i])
         pageNum = i * RES_IN_SINGLEPAGE + 1
         pageUrl = baseBbsUrl + '/' + str(pageNum) + '-'
         pageUrls.append(pageUrl)
@@ -117,8 +114,12 @@ def GetAllResInPage(tgtUrl) :
 
     # 整形済みレス本体部取得
     for rbody in resbodys:
-        b = str(rbody).replace("<br/>", "\n")  # changed here
+        # レス本体部分をStr形式にキャスト、文字列置換で改行タグを改行コードに変換し再度bs4オブジェクトに戻す
+        b = str(rbody)
+        b = b.replace("<br>", "\n")
+        b = b.replace("<br/>", "\n")
         b = BeautifulSoup(b, "html.parser").getText()
+
         b = b.strip()  # 前後から空白削除
         b = b.strip('\n')  # 前後から改行削除
         formattedBody.append(b)
@@ -145,6 +146,21 @@ def GetLatestID(fName):
 
     return id
 
+# テキスト色変え用
+def print_colored(code, text, is_bold=False):
+    if is_bold:
+        code = '1;%s' % code
+
+    print('\033[%sm%s\033[0m' % (code, text))
+
+print_red = partial(print_colored, '31')
+
+# 入力したURLがニコニコ大百科内のものかチェック
+def IsValidURL(targetURL) :
+    isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
+    return isValid
+
+
 # メイン処理スタート -----------------------------------------------------------------
 
 tgtArtUrl = TARGET_ARTICLE_URL
@@ -167,6 +183,8 @@ JST = timezone(timedelta(hours=+9), 'JST')
 now = datetime.now(JST)
 nowstamp = str(round(now.timestamp()))
 
+logDir = CheckCreateDirectory('.', LOG_STORE_DIRECTORY)
+
 art_req = requests.get(tgtArtUrl)
 art_soup = BeautifulSoup(art_req.content, 'html.parser')
 
@@ -180,8 +198,9 @@ pageTitle = titleTxt.getText()
 # 半角スペースが入っていると面倒なので置換
 pageTitle = pageTitle.replace(' ', '_')
 
-# ログファイル名は「(記事タイトル).txt」
-pediLogFileName = pageTitle + ".txt"
+# ログファイル名は「(記事タイトル).log」
+pediLogFileName = pageTitle + ".log"
+pediLogFileName = logDir + '/' + pediLogFileName
 
 # 一時メインファイル
 tmpMainFile = nowstamp + '.main' + '.tmp'
@@ -226,7 +245,6 @@ for url in targetURLs:
         resCount, formattedHead, formattedBody = GetAllResInPage(url)
 
         mark = (latestId % RES_IN_SINGLEPAGE)
-        print('[', mark, resCount, ']', end=' ', flush=True)
 
         # ヘッダ+本体の形で順に出力する。
         for i in range(mark, resCount):
@@ -239,7 +257,7 @@ for url in targetURLs:
         # if (latestId > 10) :
         #     break
 
-        # print(latestId, end=' ', flush=True)
+        print(latestId, end=' ', flush=True)
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
