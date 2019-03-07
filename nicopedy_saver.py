@@ -43,7 +43,7 @@ def GetSearchTargetURLs(baseURL, latestId) :
     soup.find('a', class_='navi').decompose()
 
     # ページャー部分を取得。
-    pagers = soup.select("div.pager")
+    pagers = soup.select("div.st-pg_contents")
 
     # ここまでで同一内容のpager[0], pager[1]が手に入る。(ページネイション項目が二箇所あるため)
     pager = pagers[0]
@@ -189,9 +189,9 @@ art_req = requests.get(tgtArtUrl)
 art_soup = BeautifulSoup(art_req.content, 'html.parser')
 
 # 取得したデータからカテゴリー要素を削除
-art_soup.find('span', class_='article-title-category').decompose()
+art_soup.find('span', class_='st-label_title-category').decompose()
 # 記事タイトルを取得（カテゴリが削除されていないとそれも含まれてしまう）
-titleTxt = art_soup.find('h1', class_='article-title')
+titleTxt = art_soup.find('div', class_='a-title')
 
 # タイトル部のテキストを取得(記事タイトルになる)
 pageTitle = titleTxt.getText()
@@ -206,7 +206,7 @@ pediLogFileName = logDir + '/' + pediLogFileName
 tmpMainFile = nowstamp + '.main' + '.tmp'
 
 # 対象ファイル削除 --------------------------------------------
-if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
+# if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
 # 対象ファイル削除 --------------------------------------------
 
 # 対象記事へのログファイルが既に存在するかチェック。
@@ -228,6 +228,8 @@ if openMode == 'w' : TeeOutput(pageTitle + '\n', writer)
 writer.close()
 
 targetURLs = GetSearchTargetURLs(tgtArtUrl, latestId)
+
+pprint(targetURLs)
 
 if targetURLs == None :
     print("Nothing any response in Article")
@@ -283,5 +285,3 @@ print("Page Name =", pageTitle)
 print("Latest ID =", latestId)
 
 # メイン処理エンド -----------------------------------------------------------------
-
-
