@@ -17,6 +17,7 @@ SCRAPING_INTERVAL_TIME = 3
 
 NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
 
+# ディレクトリの存在チェック。ない場合はmkdir
 def CheckCreateDirectory(location, dirName) :
 
     relativePath = location + '/' + dirName
@@ -86,6 +87,16 @@ def GetSearchTargetURLs(baseURL, latestId) :
         pageUrl = baseBbsUrl + '/' + str(pageNum) + '-'
         pageUrls.append(pageUrl)
 
+    # 参考用で残り時間算出
+    estSec = len(pageUrls) * SCRAPING_INTERVAL_TIME
+    estMin = estSec // 60
+    estHrs = estMin // 60
+
+    estSec = str(estSec) + 's / '
+    estMin = str(estMin) + 'm / '
+    estHrs = str(estHrs) + 'h'
+
+    print('Minimum estimation time =', estSec, estMin, estHrs)
 
     return pageUrls
 
