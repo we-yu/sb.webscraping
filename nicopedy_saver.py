@@ -25,7 +25,7 @@ def CheckCreateDirectory(location, dirName) :
     if not os.path.exists(relativePath) :
         # ディレクトリが存在しない場合は作成
         os.mkdir(relativePath)
-        print('Create',relativePath)
+        # print('Create',relativePath)
 
     return relativePath
 
@@ -105,6 +105,7 @@ def GetAllResInPage(tgtUrl) :
     # 対象URL
     r = requests.get(tgtUrl)
 
+
     # 第一引数＝解析対象　第二引数＝パーサー(何を元に解析するか：この場合はHTML)
     soup = BeautifulSoup(r.content, "html.parser")
 
@@ -119,11 +120,23 @@ def GetAllResInPage(tgtUrl) :
     # 整形済みレスヘッダ部取得
     for rhead in resheads:
         h = rhead
+
+        hObj = BeautifulSoup(str(h), 'html.parser')
+        print(bbs_name.getText())
+
+        bbs_name = hObj.find('span', class_='st-bbs_name')
         h = h.getText()  # テキスト部分抽出
         h = h.replace('\n', '')  # 不要な改行を削除
         h = h.replace(' ', '')  # 不要な空白を削除
-        h = h.replace(')', ') ')  # 整形
-        h = h.replace('ID:', ' ID:')  # 整形
+
+        # h = h.replace(')', ') ')  # 整形
+        # h = h.replace('ID:', ' ID:')  # 整形
+
+        # 文字列の先頭にある整数値(ID値)を取得
+        idVal = re.match(r'\d+', h).group()
+        # ID値の後に1個スペースを入れる。置換は一度のみ
+        h = re.sub(idVal, idVal + ' ', h, 1)
+
         formattedHead.append(h)
 
     # 整形済みレス本体部取得
@@ -149,6 +162,7 @@ def TeeOutput(text, file) :
     file.write(text + '\n')
     return
 
+# 対象ファイルの先頭部分からメタデータをぶっこ抜き、その中の当該ログファイルにおける最新ID番号を取得する
 def GetLatestID(fName):
     try:
         cmnd = ['head', '-1', fName]
@@ -174,7 +188,6 @@ print_red = partial(print_colored, '31')
 def IsValidURL(targetURL) :
     isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
     return isValid
-
 
 # メイン処理スタート -----------------------------------------------------------------
 
@@ -225,8 +238,11 @@ JST = timezone(timedelta(hours=+9), 'JST')
 now = datetime.now(JST)
 nowstamp = str(now.timestamp()).replace('.','')
 
+# 一次ファイル格納用ディレクトリ生成
+tmpDir = CheckCreateDirectory('.', nowstamp)
+
 # 一時メインファイル
-tmpMainFile = nowstamp + '.main' + '.tmp'
+tmpMainFile = tmpDir + '/' + nowstamp + '.main' + '.tmp'
 
 # 対象ファイル削除 --------------------------------------------
 # if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
@@ -260,8 +276,6 @@ targetURLs = GetSearchTargetURLs(tgtArtUrl, latestId)
 if targetURLs == None :
     print("Nothing any response in Article")
     sys.exit(0)
-
-# pprint(targetURLs)
 
 print('Progress ... ', end='', flush=True)
 
@@ -299,7 +313,7 @@ print()
 
 # --------------------------------------------------------------
 # 一時ヘッダーファイル用意
-tmpHeadFile = nowstamp + '.head' + '.tmp'
+tmpHeadFile = tmpDir + '/' + nowstamp + '.head' + '.tmp'
 
 with open(tmpHeadFile, 'w') as writer:
     metaInfo = [pageTitle, str(now.strftime("%Y-%m-%d/%H:%M")), str(latestId)]
@@ -307,9 +321,13 @@ with open(tmpHeadFile, 'w') as writer:
     TeeOutput(metaInfoLine, writer)
 # --------------------------------------------------------------
 # 一時ヘッダ・一時メインファイルの結合。最終ログファイルを出力（シェルスクリプトで実装）
-cmnd = ['./CatFiles.sh', tmpHeadFile, tmpMainFile, pediLogFileName]
+headlessFile = tmpDir + '/' + 'headless' + '.tmp'
+cmnd = ['./CatFiles.sh', tmpHeadFile, tmpMainFile, headlessFile, pediLogFileName]
+# pprint(cmnd)
 subResult = subprocess.call(cmnd)
 # --------------------------------------------------------------
+# 一時ファイル格納用ディレクトリの削除(中身ごと)
+shutil.rmtree(tmpDir)
 
 print("Output =", pediLogFileName, '(', latestId, ')' )
 
