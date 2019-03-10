@@ -122,9 +122,37 @@ def GetAllResInPage(tgtUrl) :
         h = rhead
 
         hObj = BeautifulSoup(str(h), 'html.parser')
-        print(bbs_name.getText())
+
+    #     < dt
+    #
+    #     class ="st-bbs_reshead" >
+    #
+    #     < a
+    #
+    #     class ="resnumhead" name="43" > < / a >
+    #
+    #     < span
+    #
+    #     class ="st-bbs_resNo" > 43 < / span >
+    #
+    #     < span
+    #
+    #     class ="st-bbs_name" > ななしのよっしん < / span >
+    #
+    #     < div
+    #
+    #     class ="st-bbs_resInfo" >
+    #
+    #     2019 / 02 / 17(日)
+    #     13: 19:01
+    #     ID: 1
+    #     zs3 + TsOso
+    # < / div >
+    # < / dt >
 
         bbs_name = hObj.find('span', class_='st-bbs_name')
+        print(bbs_name.getText())
+
         h = h.getText()  # テキスト部分抽出
         h = h.replace('\n', '')  # 不要な改行を削除
         h = h.replace(' ', '')  # 不要な空白を削除
