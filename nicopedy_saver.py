@@ -150,20 +150,30 @@ def GetAllResInPage(tgtUrl) :
     # < / div >
     # < / dt >
 
-        bbs_name = hObj.find('span', class_='st-bbs_name')
-        print(bbs_name.getText())
+        bbs_resNo = hObj.find('span', class_='st-bbs_resNo').getText()
+        bbs_name = hObj.find('span', class_='st-bbs_name').getText()
+        bbs_resInfo = hObj.find('div', class_='st-bbs_resInfo').getText()
+        bbs_resInfo = bbs_resInfo.strip()
+        bbs_resInfo = bbs_resInfo.strip('\n')
+        bbs_resInfo = bbs_resInfo.replace('\n', ' ')
+        pattern = r' +'
+        bbs_resInfo = re.sub(pattern, ' ', bbs_resInfo)
+        # print(bbs_resNo, bbs_name, bbs_resInfo)
+        resHeaders = [bbs_resNo, bbs_name, bbs_resInfo]
+        # print(' '.join(resHeaders))
+        h = ' '.join(resHeaders)
 
-        h = h.getText()  # テキスト部分抽出
-        h = h.replace('\n', '')  # 不要な改行を削除
-        h = h.replace(' ', '')  # 不要な空白を削除
-
-        # h = h.replace(')', ') ')  # 整形
-        # h = h.replace('ID:', ' ID:')  # 整形
-
-        # 文字列の先頭にある整数値(ID値)を取得
-        idVal = re.match(r'\d+', h).group()
-        # ID値の後に1個スペースを入れる。置換は一度のみ
-        h = re.sub(idVal, idVal + ' ', h, 1)
+        # h = h.getText()  # テキスト部分抽出
+        # h = h.replace('\n', '')  # 不要な改行を削除
+        # h = h.replace(' ', '')  # 不要な空白を削除
+        #
+        # # h = h.replace(')', ') ')  # 整形
+        # # h = h.replace('ID:', ' ID:')  # 整形
+        #
+        # # 文字列の先頭にある整数値(ID値)を取得
+        # idVal = re.match(r'\d+', h).group()
+        # # ID値の後に1個スペースを入れる。置換は一度のみ
+        # h = re.sub(idVal, idVal + ' ', h, 1)
 
         formattedHead.append(h)
 
@@ -273,7 +283,7 @@ tmpDir = CheckCreateDirectory('.', nowstamp)
 tmpMainFile = tmpDir + '/' + nowstamp + '.main' + '.tmp'
 
 # 対象ファイル削除 --------------------------------------------
-# if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
+if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
 # 対象ファイル削除 --------------------------------------------
 
 # 対象記事へのログファイルが既に存在するかチェック。
@@ -328,8 +338,8 @@ for url in targetURLs:
             latestId += 1
 
         # 動作検証中は最初のログを取ったところで止める。
-        # if (latestId > 10) :
-        #     break
+        if (latestId > 10) :
+            break
 
         # ループ中に進捗確認用のテキスト出力。Flushがないと最後にまとめて吐き出される。
         print(latestId, end=' ', flush=True)
