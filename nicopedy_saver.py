@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import re # 正規表現用
 from time import sleep      # 待ち時間用
-from pprint import pprint  # 改行付き配列出力
+from pprint import pprint   # 改行付き配列出力
 import os.path # ファイル操作用
 from datetime import datetime, timedelta, timezone
 import subprocess # シェルスクリプト呼び出し用
@@ -11,11 +11,12 @@ import sys
 import shutil   # ファイルコピー用
 from functools import partial   # テキスト色変え用
 
-RES_IN_SINGLEPAGE = 30
-LOG_STORE_DIRECTORY = 'logs'
-SCRAPING_INTERVAL_TIME = 3
+RES_IN_SINGLEPAGE = 30          # 掲示板１頁あたりのレス数
+LOG_STORE_DIRECTORY = 'logs'    # ログファイル保存ディレクトリ
+SCRAPING_INTERVAL_TIME = 3      # スクレイピング時の休み時間
 
-NICOPEDI_URL_HEAD = "https://dic.nicovideo.jp/a/"
+# ユーザ記事URLであることをマッチする確認用
+NICOPEDI_URL_HEAD_A = "https://dic.nicovideo.jp/a/"
 
 # ディレクトリの存在チェック。ない場合はmkdir
 def CheckCreateDirectory(location, dirName) :
@@ -38,8 +39,15 @@ def GetSearchTargetURLs(baseURL, latestId) :
     tgtPage = requests.get(baseURL)
     soup = BeautifulSoup(tgtPage.content, "html.parser")
 
-    # 記事タイトルが半角数値を含むとNaviタグの項目を拾ってしまうため除外
-    soup.find('a', class_='navi').decompose()
+    # st-pg_contentsが存在しない場合は、レス自体が存在しない
+    if not soup.find('div', class_='st-pg_contents') :
+        print_red('Nothing any response in this article.', is_bold=True)
+        return None
+
+    # レス数が30件以下の場合、navi自体が存在しないため、除外操作の前に実在チェック
+    if soup.find('a', class_='navi') :
+        # 記事タイトルが半角数値を含むとNaviタグの項目を拾ってしまうため除外
+        soup.find('a', class_='navi').decompose()
 
     # ページャー部分を取得。
     pagers = soup.select("div.st-pg_contents")
@@ -65,6 +73,7 @@ def GetSearchTargetURLs(baseURL, latestId) :
 
     # レスが存在しない場合はNone
     if len(txts) == 0 :
+        print('Nothing any response to get.')
         return None
 
     # ページは30*n+1で始まるので、「配列最後の要素[-1]から-1した値」を取ると最後のページ数がわかる。念の為Int化。
@@ -105,7 +114,6 @@ def GetAllResInPage(tgtUrl) :
     # 対象URL
     r = requests.get(tgtUrl)
 
-
     # 第一引数＝解析対象　第二引数＝パーサー(何を元に解析するか：この場合はHTML)
     soup = BeautifulSoup(r.content, "html.parser")
 
@@ -121,59 +129,25 @@ def GetAllResInPage(tgtUrl) :
     for rhead in resheads:
         h = rhead
 
+        # 取得したdt情報を再度文字列化し、BeautifulSoupにかけることでdt以下のタグを同じ手法で取れるようにする
         hObj = BeautifulSoup(str(h), 'html.parser')
 
-    #     < dt
-    #
-    #     class ="st-bbs_reshead" >
-    #
-    #     < a
-    #
-    #     class ="resnumhead" name="43" > < / a >
-    #
-    #     < span
-    #
-    #     class ="st-bbs_resNo" > 43 < / span >
-    #
-    #     < span
-    #
-    #     class ="st-bbs_name" > ななしのよっしん < / span >
-    #
-    #     < div
-    #
-    #     class ="st-bbs_resInfo" >
-    #
-    #     2019 / 02 / 17(日)
-    #     13: 19:01
-    #     ID: 1
-    #     zs3 + TsOso
-    # < / div >
-    # < / dt >
-
-        bbs_resNo = hObj.find('span', class_='st-bbs_resNo').getText()
-        bbs_name = hObj.find('span', class_='st-bbs_name').getText()
+        # dtタグ内における各タグ(およびクラス)を取得
+        bbs_resNo   = hObj.find('span', class_='st-bbs_resNo').getText()
+        bbs_name    = hObj.find('span', class_='st-bbs_name').getText()
         bbs_resInfo = hObj.find('div', class_='st-bbs_resInfo').getText()
+        # resInfo情報に関しては調整が必要なので前後のトリム・改行コードのち缶等を調整する
         bbs_resInfo = bbs_resInfo.strip()
         bbs_resInfo = bbs_resInfo.strip('\n')
         bbs_resInfo = bbs_resInfo.replace('\n', ' ')
+
+        # テキスト中に大量の空白が混ざっているため、正規表現で複数空白については空白一個に置換する
         pattern = r' +'
         bbs_resInfo = re.sub(pattern, ' ', bbs_resInfo)
         # print(bbs_resNo, bbs_name, bbs_resInfo)
+        # やり方はなんでもいいのだが、取得した複数のテキストを空白で区切った一行に出力。整形済みヘッダhへappendする
         resHeaders = [bbs_resNo, bbs_name, bbs_resInfo]
-        # print(' '.join(resHeaders))
         h = ' '.join(resHeaders)
-
-        # h = h.getText()  # テキスト部分抽出
-        # h = h.replace('\n', '')  # 不要な改行を削除
-        # h = h.replace(' ', '')  # 不要な空白を削除
-        #
-        # # h = h.replace(')', ') ')  # 整形
-        # # h = h.replace('ID:', ' ID:')  # 整形
-        #
-        # # 文字列の先頭にある整数値(ID値)を取得
-        # idVal = re.match(r'\d+', h).group()
-        # # ID値の後に1個スペースを入れる。置換は一度のみ
-        # h = re.sub(idVal, idVal + ' ', h, 1)
 
         formattedHead.append(h)
 
@@ -186,8 +160,8 @@ def GetAllResInPage(tgtUrl) :
         b = b.replace("<br/>", "\n")
         b = BeautifulSoup(b, "html.parser").getText()
 
-        b = b.strip()  # 前後から空白削除
-        b = b.strip('\n')  # 前後から改行削除
+        b = b.strip()       # 前後から空白削除
+        b = b.strip('\n')   # 前後から改行削除
         formattedBody.append(b)
         # カウントするのはheadでもbodyでもどちらでもいいのだが、この数が本ページにおけるレス数になる(通常は30だが最終ページでは少ない可能性あり)
         resCount += 1
@@ -224,13 +198,14 @@ print_red = partial(print_colored, '31')
 
 # 入力したURLがニコニコ大百科内のものかチェック
 def IsValidURL(targetURL) :
-    isValid = targetURL.startswith(NICOPEDI_URL_HEAD)
+    isValid = targetURL.startswith(NICOPEDI_URL_HEAD_A)
     return isValid
 
 # メイン処理スタート -----------------------------------------------------------------
 
 # コマンドライン呼び出し時の引数取得
 args = sys.argv
+# pprint(args)
 
 # args要素がゼロである(このファイルのみ)でキックされた場合は終了
 if len(args) <= 1 :
@@ -242,7 +217,7 @@ tgtArtUrl = args[1]
 # URLがニコ百科として不正な場合は終了
 if not IsValidURL(tgtArtUrl) :
     print_red('This is not valid URL.', is_bold=True)
-    print('Target URL should be under', NICOPEDI_URL_HEAD)
+    print('Target URL should be under', NICOPEDI_URL_HEAD_A)
     sys.exit(0)
 
 # ログ出力用ディレクトリを取得する。なければ作る。パーミッションについては考慮していない。
@@ -283,8 +258,10 @@ tmpDir = CheckCreateDirectory('.', nowstamp)
 tmpMainFile = tmpDir + '/' + nowstamp + '.main' + '.tmp'
 
 # 対象ファイル削除 --------------------------------------------
-if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
+# if os.path.exists(pediLogFileName) : os.remove(pediLogFileName)
 # 対象ファイル削除 --------------------------------------------
+
+print('Output log file = [', pediLogFileName, ']')
 
 # 対象記事へのログファイルが既に存在するかチェック。
 if os.path.exists(pediLogFileName) :
@@ -310,9 +287,8 @@ targetURLs = GetSearchTargetURLs(tgtArtUrl, latestId)
 
 # pprint(targetURLs)
 
-# 新規に取るべき記事がない場合はその旨メッセージ出して終了。
+# 新規に取るべき記事がない場合は終了。
 if targetURLs == None :
-    print("Nothing any response in Article")
     sys.exit(0)
 
 print('Progress ... ', end='', flush=True)
@@ -328,7 +304,7 @@ for url in targetURLs:
         # 途中スタートの場合、書き込むレスも途中からになる
         mark = (latestId % RES_IN_SINGLEPAGE)
         # ※最新取得が｢41｣だった場合、「31-」の記事における「11番目のレス」からスタートする。
-        # その後続行する場合は最新IDは「60」で終わるので、「41-」の記事では「0番目のレス」からスタートする。
+        # その後続行する場合は最新IDは「60」で終わるので、「61-」の記事では「0番目のレス」からスタートする。
 
         # ヘッダ+本体の形で順に出力する。
         for i in range(mark, resCount):
@@ -338,8 +314,8 @@ for url in targetURLs:
             latestId += 1
 
         # 動作検証中は最初のログを取ったところで止める。
-        if (latestId > 10) :
-            break
+        # if (latestId > 10) :
+        #     break
 
         # ループ中に進捗確認用のテキスト出力。Flushがないと最後にまとめて吐き出される。
         print(latestId, end=' ', flush=True)
