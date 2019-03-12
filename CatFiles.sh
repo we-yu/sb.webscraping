@@ -1,8 +1,11 @@
 #!/bin/bash
 
-tail -n +2 $2 > headerRemoved.tmp
-cat $1 headerRemoved.tmp > $3
+# $1: 一時ヘッダ
+# $2: 一時本体
+# $3: 本体から最初の一行目のみ抜いたファイル
+# $4: 最終出力ファイル
 
-rm *.tmp
+tail -n +2 $2 > $3
+cat $1 $3 > $4
 
 exit 0
