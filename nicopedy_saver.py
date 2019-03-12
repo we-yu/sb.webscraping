@@ -13,7 +13,7 @@ from functools import partial   # テキスト色変え用
 
 RES_IN_SINGLEPAGE = 30          # 掲示板１頁あたりのレス数
 LOG_STORE_DIRECTORY = 'logs'    # ログファイル保存ディレクトリ
-SCRAPING_INTERVAL_TIME = 3      # スクレイピング時の休み時間
+SCRAPING_INTERVAL_TIME = 10     # スクレイピング時の休み時間
 
 # ユーザ記事URLであることをマッチする確認用
 NICOPEDI_URL_HEAD_A = "https://dic.nicovideo.jp/a/"
