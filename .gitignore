@@ -1,6 +1,6 @@
 *.txt
 .DS_Store
 .idea/
-# logs/
+logs/
 node_modules/
 package-lock.json
