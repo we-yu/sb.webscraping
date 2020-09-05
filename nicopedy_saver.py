@@ -10,6 +10,7 @@ import subprocess # シェルスクリプト呼び出し用
 import sys
 import shutil   # ファイルコピー用
 from functools import partial   # テキスト色変え用
+from tqdm import tqdm    # プログレスバー用
 
 RES_IN_SINGLEPAGE = 30          # 掲示板１頁あたりのレス数
 LOG_STORE_DIRECTORY = 'logs'    # ログファイル保存ディレクトリ
@@ -366,7 +367,7 @@ if targetURLs == None :
 
 print('Progress ... ', end='', flush=True)
 
-for url in targetURLs:
+for url in tqdm(targetURLs):
 
     # インターバル中にファイルを掴みっぱなしなのは気持ち悪いからURL毎にオープン・クローズする(どっちがいいんだろう…)
     with open(tmpMainFile, 'a') as writer:
@@ -391,7 +392,7 @@ for url in targetURLs:
         #     break
 
         # ループ中に進捗確認用のテキスト出力。Flushがないと最後にまとめて吐き出される。
-        print(latestId, end=' ', flush=True)
+        # print(latestId, end=' ', flush=True)
 
     # インターバルを入れる。最後のURLを取得した場合はスキップ。
     if url != targetURLs[-1] : sleep(SCRAPING_INTERVAL_TIME)
