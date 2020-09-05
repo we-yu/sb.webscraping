@@ -165,7 +165,11 @@ def GetAllResInPage(tgtUrl) :
         # お絵カキコ・ピコカキコ情報を残してプレイヤーを削除
         bbs_contentsTitle = "" # タイトル: 以降の文字列
         bbs_resOekakiURL = ""  # お絵カキコの画像リンク
+<<<<<<< HEAD
         bbs_resPicoURL = GetPikokakikoURL(bObj)    # ピコ文字へのリンク
+=======
+        bbs_resPicoURL = ""    # ピコ文字へのリンク
+>>>>>>> somefix
         contentsString = ""    # レス末尾にコンテンツ情報を追加
         hasOekaki=False        # お絵カキコの有無
         # お絵カキコIDの取得
