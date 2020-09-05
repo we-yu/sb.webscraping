@@ -199,7 +199,7 @@ def GetAllResInPage(tgtUrl) :
         ilfrom=bObj('a',href=re.compile('^/b/a/'))
         for x in ilfrom:
             if(x.getText() == 'この絵を基にしています！'):
-                bbs_contentsFromURL = x.get('href')
+                bbs_contentsFromURL = "https://dic.nicovideo.jp"+x.get('href')
                 x.decompose()
         
         
