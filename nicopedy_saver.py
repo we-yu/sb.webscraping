@@ -153,15 +153,71 @@ def GetAllResInPage(tgtUrl) :
 
     # 整形済みレス本体部取得
     for rbody in resbodys:
+    
         # レス本体部分をStr形式にキャスト、文字列置換で改行タグを改行コードに変換し再度bs4オブジェクトに戻す
         # これを行わないとWebページ上では改行されていた箇所が全部消えてあらゆるレスが１行になる
         b = str(rbody)
         b = b.replace("<br>", "\n")
         b = b.replace("<br/>", "\n")
-        b = BeautifulSoup(b, "html.parser").getText()
+        bObj = BeautifulSoup(b, "html.parser")
 
-        b = b.strip()       # 前後から空白削除
-        b = b.strip('\n')   # 前後から改行削除
+        # お絵カキコ・ピコカキコを取り出す
+        
+        bbs_contentsTitle=""
+        bbs_resOekakiURL=""
+        bbs_resPicoURL=""
+        contentsString=""
+        hasTitle=False
+        bbs_resOekakiObj = bObj.find('div', class_='st-bbs_contents-oekaki')
+        if(bbs_resOekakiObj is not None):
+            # お絵カキコが存在する時、画像のURLのみ取り出し除去する
+            bbs_resOekakiURL = bbs_resOekakiObj.img.get('data-src')
+            bbs_resOekakiObj.decompose()
+        bbs_resPicoURL=""
+        bbs_resPicoObj = bObj.find('div', class_="st-space_top-middle")
+        if( bbs_resPicoObj is not None):
+            # ピコカキコが存在する時、ピコ文字のURLを取り出し除去（再生ページ概念あるといいのに）
+            bbs_contentsPicoID=bbs_resPicoObj.get('id').lstrip('pikobbs')
+            bbs_resPicoURL = 'https://dic.nicovideo.jp/mml/{}'.format(bbs_contentsPicoID)
+            bbs_resPicoObj.decompose()
+        
+        # タイトル取得
+        bbs_contentsTitleObj = bObj.find(class_='st-bbs_contentsTitle')
+            
+        if(bbs_contentsTitleObj is not None):
+            bbs_contentsTitle = bbs_contentsTitleObj.getText().lstrip('タイトル:')
+            bbs_contentsTitleObj.decompose()
+            hasTitle=True
+        
+        # ピコカキコはformでくくられているが、お絵カキコはくくられていない
+        [x.decompose() for x in bObj('form')]
+        [x.decompose() for x in bObj('label')]
+        [x.decompose() for x in bObj('div', class_='st-bbsArea_buttons')]
+
+        bbs_contentsFromURL=""
+        ilfrom=bObj('a',href=re.compile('^/b/a/'))
+        for x in ilfrom:
+            if(x.getText() == 'この絵を基にしています！'):
+                bbs_contentsFromURL = x.get('href')
+                x.decompose()
+        
+        
+        # テキスト置換した要素を追加する
+        if(len(bbs_resOekakiURL)!=0):
+            contentsString += '\n[お絵カキコ: {}]({})'.format(bbs_contentsTitle,bbs_resOekakiURL)
+        if(len(bbs_resPicoURL)!=0):
+            contentsString += '\n[ピコカキコ: {}]({})'.format(bbs_contentsTitle,bbs_resPicoURL)
+        if(len(bbs_contentsFromURL)!=0):
+            contentsString += '[元ネタ]({})'.format(bbs_contentsFromURL)
+        
+        
+        b=bObj.getText()
+
+        b = b.strip(' \n')       # 前後から空白と改行を削除
+        if(hasTitle):
+            b = b.rstrip('画像をクリックして再生!!') # タグで括られていない
+            b = b.strip(' \n')       # 前後から空白と改行を削除
+        b+=contentsString
         formattedBody.append(b)
         # カウントするのはheadでもbodyでもどちらでもいいのだが、この数が本ページにおけるレス数になる(通常は30だが最終ページでは少ない可能性あり)
         resCount += 1
@@ -231,6 +287,10 @@ art_soup = BeautifulSoup(art_req.content, 'html.parser')
 art_soup.find('span', class_='st-label_title-category').decompose()
 # よみがな部分を削除
 art_soup.find('div', class_='a-title-yomi').decompose()
+# ほめる・広告部分を削除
+homeru=art_soup.find('ul', class_='article-title-counter')
+if( homeru is not None):
+	homeru.decompose()
 # 記事タイトルを取得（カテゴリが削除されていないとそれも含まれてしまう）
 titleTxt = art_soup.find('div', class_='a-title')
 
@@ -238,9 +298,22 @@ titleTxt = art_soup.find('div', class_='a-title')
 pageTitle = titleTxt.getText()
 # タイトル分前後に余計な空白・改行が入ってるケースがあるのでトリム
 pageTitle = pageTitle.strip()
-pageTitle = pageTitle.strip('\n')
 # 半角スペースが入っていると面倒なので置換
+pageTitle = pageTitle.replace('\n','')
+pageTitle = pageTitle.replace('\r','')
 pageTitle = pageTitle.replace(' ', '_')
+#使えない文字も置換
+# Windows
+pageTitle = pageTitle.replace('\\','￥')
+pageTitle = pageTitle.replace('/','／')
+pageTitle = pageTitle.replace(':','：')
+pageTitle = pageTitle.replace('*','＊')
+pageTitle = pageTitle.replace('?','？')
+pageTitle = pageTitle.replace('\"','”')
+pageTitle = pageTitle.replace('<','＜')
+pageTitle = pageTitle.replace('>','＞')
+pageTitle = pageTitle.replace('|','｜')
+print('[',pageTitle,']')
 
 # ログファイル名は「(記事タイトル).log」
 pediLogFileName = pageTitle + ".log"
