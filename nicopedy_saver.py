@@ -110,6 +110,7 @@ def GetSearchTargetURLs(baseURL, latestId) :
 
     return pageUrls
 
+
 # 対象掲示板ページから全レスを取得する。
 def GetAllResInPage(tgtUrl) :
     # 対象URL
@@ -154,7 +155,6 @@ def GetAllResInPage(tgtUrl) :
 
     # 整形済みレス本体部取得
     for rbody in resbodys:
-    
         # レス本体部分をStr形式にキャスト、文字列置換で改行タグを改行コードに変換し再度bs4オブジェクトに戻す
         # これを行わないとWebページ上では改行されていた箇所が全部消えてあらゆるレスが１行になる
         b = str(rbody)
@@ -162,19 +162,20 @@ def GetAllResInPage(tgtUrl) :
         b = b.replace("<br/>", "\n")
         bObj = BeautifulSoup(b, "html.parser")
 
-        # お絵カキコ・ピコカキコを取り出す
-        
-        bbs_contentsTitle=""
-        bbs_resOekakiURL=""
-        bbs_resPicoURL=""
-        contentsString=""
-        hasTitle=False
+        # お絵カキコ・ピコカキコ情報を残してプレイヤーを削除
+        bbs_contentsTitle = "" # タイトル: 以降の文字列
+        bbs_resOekakiURL = ""  # お絵カキコの画像リンク
+        bbs_resPicoURL = GetPikokakikoURL(bObj)    # ピコ文字へのリンク
+        contentsString = ""    # レス末尾にコンテンツ情報を追加
+        hasOekaki=False        # お絵カキコの有無
+        # お絵カキコIDの取得
         bbs_resOekakiObj = bObj.find('div', class_='st-bbs_contents-oekaki')
         if(bbs_resOekakiObj is not None):
             # お絵カキコが存在する時、画像のURLのみ取り出し除去する
             bbs_resOekakiURL = bbs_resOekakiObj.img.get('data-src')
             bbs_resOekakiObj.decompose()
-        bbs_resPicoURL=""
+            hasOekaki=True
+        # ピコカキコIDの取得
         bbs_resPicoObj = bObj.find('div', class_="st-space_top-middle")
         if( bbs_resPicoObj is not None):
             # ピコカキコが存在する時、ピコ文字のURLを取り出し除去（再生ページ概念あるといいのに）
@@ -184,39 +185,37 @@ def GetAllResInPage(tgtUrl) :
         
         # タイトル取得
         bbs_contentsTitleObj = bObj.find(class_='st-bbs_contentsTitle')
-            
         if(bbs_contentsTitleObj is not None):
             bbs_contentsTitle = bbs_contentsTitleObj.getText().lstrip('タイトル:')
             bbs_contentsTitleObj.decompose()
-            hasTitle=True
         
-        # ピコカキコはformでくくられているが、お絵カキコはくくられていない
+        # ピコカキコはformでくくられているが、お絵カキコはくくられていないので要素を一つずつ取り除く
         [x.decompose() for x in bObj('form')]
         [x.decompose() for x in bObj('label')]
         [x.decompose() for x in bObj('div', class_='st-bbsArea_buttons')]
 
         bbs_contentsFromURL=""
+        # 「この絵を基にしています！」を除去
         ilfrom=bObj('a',href=re.compile('^/b/a/'))
         for x in ilfrom:
             if(x.getText() == 'この絵を基にしています！'):
                 bbs_contentsFromURL = "https://dic.nicovideo.jp"+x.get('href')
                 x.decompose()
         
-        
-        # テキスト置換した要素を追加する
+        # 読み取った情報を追加する
         if(len(bbs_resOekakiURL)!=0):
             contentsString += '\n[お絵カキコ: {}]({})'.format(bbs_contentsTitle,bbs_resOekakiURL)
         if(len(bbs_resPicoURL)!=0):
             contentsString += '\n[ピコカキコ: {}]({})'.format(bbs_contentsTitle,bbs_resPicoURL)
         if(len(bbs_contentsFromURL)!=0):
-            contentsString += '[元ネタ]({})'.format(bbs_contentsFromURL)
-        
-        
+            contentsString += ' [元ネタ]({})'.format(bbs_contentsFromURL)
+
         b=bObj.getText()
 
+        # プレイヤーの一部がタグで括られていないため、テキストから削る
         b = b.strip(' \n')       # 前後から空白と改行を削除
-        if(hasTitle):
-            b = b.rstrip('画像をクリックして再生!!') # タグで括られていない
+        if(hasOekaki):
+            b = b.rstrip('画像をクリックして再生!!') # タグで括られていない（いつか括られるようようになれば不要になるかも）
             b = b.strip(' \n')       # 前後から空白と改行を削除
         b+=contentsString
         formattedBody.append(b)
@@ -300,11 +299,10 @@ pageTitle = titleTxt.getText()
 # タイトル分前後に余計な空白・改行が入ってるケースがあるのでトリム
 pageTitle = pageTitle.strip()
 # 半角スペースが入っていると面倒なので置換
-pageTitle = pageTitle.replace('\n','')
-pageTitle = pageTitle.replace('\r','')
 pageTitle = pageTitle.replace(' ', '_')
 #使えない文字も置換
-# Windows
+pageTitle = pageTitle.replace('\n','')
+# Windows (\/:*?"<>|)
 pageTitle = pageTitle.replace('\\','￥')
 pageTitle = pageTitle.replace('/','／')
 pageTitle = pageTitle.replace(':','：')
