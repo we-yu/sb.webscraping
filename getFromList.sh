@@ -8,5 +8,5 @@ cd $SCRIPT_DIR
 # touch executed.txt
 echo "---" >>  scrapingTime.log
 date >> scrapingTime.log
-cat AutoLoadArticleList.txt  | grep -vF '#' | xargs -I{} /usr/local/bin/python3.7 nicopedy_saver.py {}
+cat AutoLoarArticleList.txt  | grep -vF '#' | xargs -I{} /usr/local/bin/python3.7 nicopedy_saver.py {}
 date >> scrapingTime.log

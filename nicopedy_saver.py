@@ -13,7 +13,7 @@ from functools import partial   # テキスト色変え用
 
 RES_IN_SINGLEPAGE = 30          # 掲示板１頁あたりのレス数
 LOG_STORE_DIRECTORY = 'logs'    # ログファイル保存ディレクトリ
-SCRAPING_INTERVAL_TIME = 3      # スクレイピング時の休み時間
+SCRAPING_INTERVAL_TIME = 1      # スクレイピング時の休み時間
 
 # ユーザ記事URLであることをマッチする確認用
 NICOPEDI_URL_HEAD_A = "https://dic.nicovideo.jp/a/"
@@ -227,15 +227,33 @@ logDir = CheckCreateDirectory('.', LOG_STORE_DIRECTORY)
 art_req = requests.get(tgtArtUrl)
 art_soup = BeautifulSoup(art_req.content, 'html.parser')
 
+# リダイレクトされた場合は終了
+meta_refresh = art_soup.find('meta', attrs={'http-equiv': 'refresh'})
+if meta_refresh:
+    redirected = True
+    print_red('This article is redirected.', is_bold=True)
+    sys.exit(0)
+
 # 取得したデータからカテゴリー要素を削除
-art_soup.find('span', class_='st-label_title-category').decompose()
+if art_soup.find('span', class_='st-label_title-category') != None :
+    art_soup.find('span', class_='st-label_title-category').decompose()
 # よみがな部分を削除
-art_soup.find('div', class_='a-title-yomi').decompose()
+if art_soup.find('div', class_='a-title-yomi') != None :
+    art_soup.find('div', class_='a-title-yomi').decompose()
+
+if art_soup.find('div', class_='a-title-article-text-count-wrap') != None :
+    art_soup.find('div', class_='a-title-article-text-count-wrap').decompose()
+if art_soup.find('ul', class_='article-title-counter') != None :
+    art_soup.find('ul', class_='article-title-counter').decompose()
+
 # 記事タイトルを取得（カテゴリが削除されていないとそれも含まれてしまう）
 titleTxt = art_soup.find('div', class_='a-title')
+titleTxt = titleTxt.find('a', class_='self_link')
 
 # タイトル部のテキストを取得(記事タイトルになる)
 pageTitle = titleTxt.getText()
+
+# print("pageTitle = ", pageTitle ,":::")
 # タイトル分前後に余計な空白・改行が入ってるケースがあるのでトリム
 pageTitle = pageTitle.strip()
 pageTitle = pageTitle.strip('\n')
@@ -245,6 +263,9 @@ pageTitle = pageTitle.replace(' ', '_')
 # ログファイル名は「(記事タイトル).log」
 pediLogFileName = pageTitle + ".log"
 pediLogFileName = logDir + '/' + pediLogFileName
+
+print(f"pediLogFileName = [{pediLogFileName}]")
+
 
 # Unixタイム(ミリ秒)を一時ファイルの名称として使用する
 JST = timezone(timedelta(hours=+9), 'JST')
@@ -285,6 +306,7 @@ writer.close()
 # 現時点における最新IDから、取得を開始するべきURLを取得する。（スタート〜ラストを配列で取得）
 targetURLs = GetSearchTargetURLs(tgtArtUrl, latestId)
 
+# print("TITLE =", pageTitle)
 # pprint(targetURLs)
 
 # 新規に取るべき記事がない場合は終了。
